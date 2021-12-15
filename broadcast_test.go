@@ -6,7 +6,8 @@ import (
 	"time"
 )
 
-func TestBroadCaster_Join(t *testing.T) {
+// TestBroadCaster_Back ensures that a message will not be received by the sender itself.
+func TestBroadCaster_Back(t *testing.T) {
 	const N = 10
 	broadcaster := New()
 	wg := sync.WaitGroup{}
@@ -31,7 +32,8 @@ func TestBroadCaster_Join(t *testing.T) {
 	wg.Wait()
 }
 
-func TestBroadCaster_Join2(t *testing.T) {
+// TestBroadCaster_Duplicate ensures that a receiver will not receive a message twice.
+func TestBroadCaster_Duplicate(t *testing.T) {
 	const N = 10
 	broadcaster := New()
 	wg := sync.WaitGroup{}
