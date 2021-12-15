@@ -63,3 +63,18 @@ func TestBroadCaster_Duplicate(t *testing.T) {
 	close(sender)
 	wg.Wait()
 }
+
+func BenchmarkBroadCaster(b *testing.B) {
+	broadcaster := New()
+	sender, _ := broadcaster.Join(time.Second)
+	for i := 0; i < 1024; i++ {
+		go func() {
+			_, receiver := broadcaster.Join(time.Second)
+			for range receiver {
+			}
+		}()
+	}
+	for i := 0; i < b.N; i++ {
+		sender <- i
+	}
+}
