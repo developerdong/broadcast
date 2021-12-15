@@ -28,22 +28,44 @@ func (b *BroadCaster) Join(timeout time.Duration) (sender chan<- interface{}, re
 	b.receivers[re] = struct{}{}
 	b.mu.Unlock()
 	go func() {
-		wg := sync.WaitGroup{}
+		timer := time.NewTimer(timeout)
+		beforeGroup, afterGroup := make([]chan<- interface{}, 0), make([]chan<- interface{}, 0)
 		for m := range se {
+			// reset the timer
+			if !timer.Stop() {
+				<-timer.C
+			}
+			timer.Reset(timeout)
+			// broadcast messages
+			beforeGroup, afterGroup = beforeGroup[:0], afterGroup[:0]
 			b.mu.RLock()
-			wg.Add(len(b.receivers) - 1)
 			for r := range b.receivers {
 				if r != re {
-					go func(r chan<- interface{}) {
-						select {
-						case r <- m:
-						case <-time.After(timeout):
-						}
-						wg.Done()
-					}(r)
+					select {
+					case r <- m:
+					case <-timer.C:
+						goto finish
+					default:
+						beforeGroup = append(beforeGroup, r)
+					}
 				}
 			}
-			wg.Wait()
+			for {
+				if len(beforeGroup) == 0 {
+					goto finish
+				}
+				for _, r := range beforeGroup {
+					select {
+					case r <- m:
+					case <-timer.C:
+						goto finish
+					default:
+						afterGroup = append(afterGroup, r)
+					}
+				}
+				beforeGroup, afterGroup = afterGroup, afterGroup[:0]
+			}
+		finish:
 			b.mu.RUnlock()
 		}
 		b.mu.Lock()
