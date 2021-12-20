@@ -29,7 +29,6 @@ func (b *BroadCaster) Join(timeout time.Duration) (sender chan<- interface{}, re
 	b.mu.Unlock()
 	go func() {
 		timer := time.NewTimer(timeout)
-		beforeGroup, afterGroup := make([]chan<- interface{}, 0), make([]chan<- interface{}, 0)
 		for m := range se {
 			// reset the timer
 			if !timer.Stop() {
@@ -37,35 +36,25 @@ func (b *BroadCaster) Join(timeout time.Duration) (sender chan<- interface{}, re
 			}
 			timer.Reset(timeout)
 			// broadcast messages
-			beforeGroup, afterGroup = beforeGroup[:0], afterGroup[:0]
+			blocking := true
 			b.mu.RLock()
 			for r := range b.receivers {
 				if r != re {
-					select {
-					case r <- m:
-					case <-timer.C:
-						goto finish
-					default:
-						beforeGroup = append(beforeGroup, r)
+					if blocking {
+						select {
+						case r <- m:
+						case <-timer.C:
+							// If this operation has expired, the next operations should be non-blocking.
+							blocking = false
+						}
+					} else {
+						select {
+						case r <- m:
+						default:
+						}
 					}
 				}
 			}
-			for {
-				if len(beforeGroup) == 0 {
-					goto finish
-				}
-				for _, r := range beforeGroup {
-					select {
-					case r <- m:
-					case <-timer.C:
-						goto finish
-					default:
-						afterGroup = append(afterGroup, r)
-					}
-				}
-				beforeGroup, afterGroup = afterGroup, afterGroup[:0]
-			}
-		finish:
 			b.mu.RUnlock()
 		}
 		b.mu.Lock()
