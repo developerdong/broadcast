@@ -30,13 +30,17 @@ func (b *BroadCaster) Join(timeout time.Duration) (sender chan<- interface{}, re
 	go func() {
 		timer := time.NewTimer(timeout)
 		for m := range se {
-			// reset the timer
-			if !timer.Stop() {
-				<-timer.C
+			var blocking bool
+			if timeout > 0 {
+				// Only block the sending operation when the timeout is bigger than 0.
+				blocking = true
+				// Reset the timer.
+				if !timer.Stop() {
+					<-timer.C
+				}
+				timer.Reset(timeout)
 			}
-			timer.Reset(timeout)
-			// broadcast messages
-			blocking := true
+			// Broadcast messages.
 			b.mu.RLock()
 			for r := range b.receivers {
 				if r != re {
