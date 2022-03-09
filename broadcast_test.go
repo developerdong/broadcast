@@ -1,6 +1,7 @@
 package broadcast
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -61,6 +62,40 @@ func TestBroadCaster_Duplicate(t *testing.T) {
 		sender <- i
 	}
 	close(sender)
+	wg.Wait()
+}
+
+func TestBroadCaster_ZeroTimeout(t *testing.T) {
+	const N = 10000
+	const Timeout = 0
+	broadcaster := New()
+	sender, _ := broadcaster.Join(Timeout)
+	_, receiver := broadcaster.Join(Timeout)
+	ctx, cancel := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		defer cancel()
+		for i := 0; i < N; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			case sender <- struct{}{}:
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		defer cancel()
+		for i := 0; i < N; i++ {
+			select {
+			case <-ctx.Done():
+				return
+			case <-receiver:
+			}
+		}
+	}()
 	wg.Wait()
 }
 
