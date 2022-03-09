@@ -99,6 +99,18 @@ func TestBroadCaster_ZeroTimeout(t *testing.T) {
 	wg.Wait()
 }
 
+func TestBroadCaster_Block(t *testing.T) {
+	broadcaster := New()
+	sender, _ := broadcaster.Join(time.Second)
+	_, _ = broadcaster.Join(time.Second)
+	startTime := time.Now()
+	sender <- struct{}{}
+	sender <- struct{}{}
+	if duration := time.Since(startTime); duration < time.Second {
+		t.Errorf("the operation should be blocked at least 1 second, but we got %v", duration)
+	}
+}
+
 func BenchmarkBroadCaster(b *testing.B) {
 	broadcaster := New()
 	sender, _ := broadcaster.Join(time.Second)
