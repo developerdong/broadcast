@@ -36,7 +36,11 @@ func (b *BroadCaster) Join(timeout time.Duration) (sender chan<- interface{}, re
 				blocking = true
 				// Reset the timer.
 				if !timer.Stop() {
-					<-timer.C
+					// The timer may have been drained, where the operation will block forever.
+					select {
+					case <-timer.C:
+					default:
+					}
 				}
 				timer.Reset(timeout)
 			}

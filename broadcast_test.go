@@ -65,38 +65,40 @@ func TestBroadCaster_Duplicate(t *testing.T) {
 	wg.Wait()
 }
 
-func TestBroadCaster_ZeroTimeout(t *testing.T) {
+// TestBroadCaster_Timeout ensures the correctness of package in some edge cases.
+func TestBroadCaster_Timeout(t *testing.T) {
 	const N = 10000
-	const Timeout = 0
-	broadcaster := New()
-	sender, _ := broadcaster.Join(Timeout)
-	_, receiver := broadcaster.Join(Timeout)
-	ctx, cancel := context.WithCancel(context.Background())
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		defer cancel()
-		for i := 0; i < N; i++ {
-			select {
-			case <-ctx.Done():
-				return
-			case sender <- struct{}{}:
+	for _, timeout := range [...]time.Duration{-1, 0, 1} {
+		broadcaster := New()
+		sender, _ := broadcaster.Join(timeout)
+		_, receiver := broadcaster.Join(timeout)
+		ctx, cancel := context.WithCancel(context.Background())
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			defer cancel()
+			for i := 0; i < N; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				case sender <- struct{}{}:
+				}
 			}
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		defer cancel()
-		for i := 0; i < N; i++ {
-			select {
-			case <-ctx.Done():
-				return
-			case <-receiver:
+		}()
+		go func() {
+			defer wg.Done()
+			defer cancel()
+			for i := 0; i < N; i++ {
+				select {
+				case <-ctx.Done():
+					return
+				case <-receiver:
+				}
 			}
-		}
-	}()
-	wg.Wait()
+		}()
+		wg.Wait()
+	}
 }
 
 func TestBroadCaster_Block(t *testing.T) {
